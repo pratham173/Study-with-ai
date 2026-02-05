@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import {
+  validateEmail,
+  validatePassword,
+  PASSWORD_MIN_LENGTH,
+} from "@/lib/validation";
 
 export async function POST(req: Request) {
   try {
@@ -14,15 +19,14 @@ export async function POST(req: Request) {
       );
     }
 
-    if (password.length < 6) {
+    if (!validatePassword(password)) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        { error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters` },
         { status: 400 }
       );
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!validateEmail(email)) {
       return NextResponse.json(
         { error: "Invalid email address" },
         { status: 400 }

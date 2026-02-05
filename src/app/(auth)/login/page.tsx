@@ -14,6 +14,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  validateEmail,
+  validatePassword,
+  PASSWORD_MIN_LENGTH,
+} from "@/lib/validation";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -28,14 +33,13 @@ export default function LoginPage() {
       return false;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!validateEmail(email)) {
       setError("Please enter a valid email address");
       return false;
     }
 
-    if (password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (!validatePassword(password)) {
+      setError(`Password must be at least ${PASSWORD_MIN_LENGTH} characters`);
       return false;
     }
 
