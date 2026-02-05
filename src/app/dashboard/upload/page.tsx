@@ -74,6 +74,20 @@ export default function UploadPage() {
         body: formData,
       });
 
+      // Check if response is OK before parsing JSON
+      if (!response.ok) {
+        const text = await response.text();
+        let errorMessage = "Failed to upload file";
+        try {
+          const errorData = JSON.parse(text);
+          errorMessage = errorData.error || errorMessage;
+        } catch {
+          errorMessage = text || `Server error: ${response.status}`;
+        }
+        setUploadResult({ success: false, error: errorMessage });
+        return;
+      }
+
       const data: UploadResponse = await response.json();
       setUploadResult(data);
 
