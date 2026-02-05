@@ -73,7 +73,7 @@ export default function SignupPage() {
         body: JSON.stringify({
           email: email.toLowerCase(),
           password,
-          name: name || undefined,
+          name: name.trim() || undefined,
         }),
       });
 
@@ -98,7 +98,6 @@ export default function SignupPage() {
       }
 
       router.push("/dashboard");
-      router.refresh();
     } catch (error) {
       console.error("Signup error:", error);
       setError("Something went wrong. Please try again.");
