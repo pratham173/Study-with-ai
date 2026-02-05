@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Plus, Loader2, Calendar } from "lucide-react";
+import { FileText, Plus, Loader2, Calendar, BookOpen } from "lucide-react";
 
 interface NoteItem {
   id: string;
   title: string;
   createdAt: string;
   originalFileName?: string;
+  flashcardCount?: number;
 }
 
 export default function NotesListPage() {
@@ -28,7 +29,22 @@ export default function NotesListPage() {
       const data = await response.json();
 
       if (data.success) {
-        setNotes(data.notes);
+        // Fetch flashcard counts for each note
+        const notesWithCounts = await Promise.all(
+          data.notes.map(async (note: NoteItem) => {
+            try {
+              const flashcardsResponse = await fetch(`/api/flashcards?noteId=${note.id}`);
+              const flashcardsData = await flashcardsResponse.json();
+              return {
+                ...note,
+                flashcardCount: flashcardsData.success ? flashcardsData.flashcards.length : 0,
+              };
+            } catch {
+              return { ...note, flashcardCount: 0 };
+            }
+          })
+        );
+        setNotes(notesWithCounts);
       }
     } catch (error) {
       console.error("Failed to fetch notes:", error);
@@ -95,13 +111,21 @@ export default function NotesListPage() {
                   )}
                 </CardHeader>
                 <CardContent>
-                  <div className="flex items-center text-sm text-muted-foreground">
-                    <Calendar className="h-4 w-4 mr-2" />
-                    {new Date(note.createdAt).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center text-sm text-muted-foreground">
+                      <Calendar className="h-4 w-4 mr-2" />
+                      {new Date(note.createdAt).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      })}
+                    </div>
+                    {note.flashcardCount !== undefined && note.flashcardCount > 0 && (
+                      <div className="flex items-center text-sm text-primary">
+                        <BookOpen className="h-4 w-4 mr-1" />
+                        {note.flashcardCount} cards
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

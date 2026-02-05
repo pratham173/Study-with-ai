@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Loader2, Sparkles, BookOpen } from "lucide-react";
 import { NoteContent } from "@/types/index";
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
@@ -14,6 +14,7 @@ interface Note {
   title: string;
   content: NoteContent;
   createdAt: string;
+  flashcardCount?: number;
 }
 
 export default function NoteDetailPage() {
@@ -23,6 +24,7 @@ export default function NoteDetailPage() {
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['overview', 'definitions', 'formulas', 'howToUse', 'problems', 'applications', 'summary', 'formulaSheet'])
   );
@@ -38,6 +40,12 @@ export default function NoteDetailPage() {
 
       if (data.success) {
         setNote(data.note);
+        // Fetch flashcard count
+        const flashcardsResponse = await fetch(`/api/flashcards?noteId=${noteId}`);
+        const flashcardsData = await flashcardsResponse.json();
+        if (flashcardsData.success) {
+          setNote(prev => prev ? { ...prev, flashcardCount: flashcardsData.flashcards.length } : null);
+        }
       } else {
         setError(data.error || "Failed to load note");
       }
@@ -46,6 +54,33 @@ export default function NoteDetailPage() {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGenerateFlashcards = async () => {
+    if (!note || generatingFlashcards) return;
+    
+    setGeneratingFlashcards(true);
+    try {
+      const response = await fetch('/api/generate/flashcards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId: note.id }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setNote(prev => prev ? { ...prev, flashcardCount: data.count } : null);
+        router.push(`/dashboard/flashcards?noteId=${note.id}`);
+      } else {
+        alert(data.error || 'Failed to generate flashcards');
+      }
+    } catch (error) {
+      console.error('Error generating flashcards:', error);
+      alert('Failed to generate flashcards');
+    } finally {
+      setGeneratingFlashcards(false);
     }
   };
 
@@ -112,6 +147,34 @@ export default function NoteDetailPage() {
                 Created on {new Date(note.createdAt).toLocaleDateString()}
               </p>
             </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {note.flashcardCount && note.flashcardCount > 0 ? (
+              <Button 
+                onClick={() => router.push(`/dashboard/flashcards?noteId=${note.id}`)}
+                variant="outline"
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                View Flashcards ({note.flashcardCount})
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleGenerateFlashcards}
+                disabled={generatingFlashcards}
+              >
+                {generatingFlashcards ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate Flashcards
+                  </>
+                )}
+              </Button>
+            )}
           </div>
         </div>
 
