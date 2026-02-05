@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,7 +20,7 @@ interface FlashcardData {
 
 type DifficultyFilter = 'ALL' | 'BASIC' | 'INTERMEDIATE' | 'ADVANCED';
 
-export default function FlashcardsPage() {
+function FlashcardsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const noteIdParam = searchParams.get('noteId');
@@ -350,5 +350,17 @@ export default function FlashcardsPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function FlashcardsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    }>
+      <FlashcardsContent />
+    </Suspense>
   );
 }
