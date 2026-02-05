@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
@@ -16,9 +16,10 @@ interface Note {
   createdAt: string;
 }
 
-export default async function NoteDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default function NoteDetailPage() {
   const router = useRouter();
-  const resolvedParams = await params;
+  const params = useParams();
+  const noteId = params.id as string;
   const [note, setNote] = useState<Note | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,11 +29,11 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
 
   useEffect(() => {
     fetchNote();
-  }, [resolvedParams.id]);
+  }, [noteId]);
 
   const fetchNote = async () => {
     try {
-      const response = await fetch(`/api/notes/${resolvedParams.id}`);
+      const response = await fetch(`/api/notes/${noteId}`);
       const data = await response.json();
 
       if (data.success) {
@@ -224,7 +225,7 @@ export default async function NoteDetailPage({ params }: { params: Promise<{ id:
                             </div>
                             <div className="bg-primary/10 rounded p-3 text-center">
                               <p className="font-medium mb-1">Answer:</p>
-                              <BlockMath math={problem.answer.replace(/^\\boxed\{|\}$/g, '')} />
+                              <BlockMath math={problem.answer.replace(/^\\boxed\{/, '').replace(/\}$/, '')} />
                             </div>
                           </div>
                         ))}
