@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ChevronLeft, ChevronRight, Filter, Loader2, BookOpen } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 interface FlashcardData {
   id: string;
@@ -139,6 +140,7 @@ function FlashcardsContent() {
               Exit Study Mode
             </Button>
             <div className="flex items-center gap-2">
+              <ThemeSwitcher />
               <span className={`px-3 py-1 rounded-full text-white text-sm ${getDifficultyColor(currentCard.difficulty)}`}>
                 {currentCard.difficulty}
               </span>
@@ -240,6 +242,7 @@ function FlashcardsContent() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeSwitcher />
             <Button
               variant={difficultyFilter === 'ALL' ? 'default' : 'outline'}
               size="sm"

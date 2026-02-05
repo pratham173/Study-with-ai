@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, FileText, CheckCircle, XCircle, Loader2, FileSpreadsheet } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 interface UploadResponse {
   success: boolean;
@@ -142,9 +143,12 @@ export default function UploadPage() {
               Upload your documents to extract and analyze content
             </p>
           </div>
-          <Button variant="outline" onClick={() => window.history.back()}>
-            Back to Dashboard
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            <Button variant="outline" onClick={() => window.history.back()}>
+              Back to Dashboard
+            </Button>
+          </div>
         </div>
 
         <Card>

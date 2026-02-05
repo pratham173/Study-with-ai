@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Upload, FileText, BookOpen } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -15,9 +16,12 @@ export default function DashboardPage() {
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-4xl font-bold">Dashboard</h1>
-          <Button onClick={() => signOut({ callbackUrl: "/login" })}>
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            <Button onClick={() => signOut({ callbackUrl: "/login" })}>
+              Sign Out
+            </Button>
+          </div>
         </div>
         
         <Card>

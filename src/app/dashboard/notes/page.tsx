@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { FileText, Plus, Loader2, Calendar, BookOpen } from "lucide-react";
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
 
 interface NoteItem {
   id: string;
@@ -71,10 +72,13 @@ export default function NotesListPage() {
               All your generated study notes in one place
             </p>
           </div>
-          <Button onClick={() => router.push("/dashboard/upload")}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Note
-          </Button>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            <Button onClick={() => router.push("/dashboard/upload")}>
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Note
+            </Button>
+          </div>
         </div>
 
         {notes.length === 0 ? (

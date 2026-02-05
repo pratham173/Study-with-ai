@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, ChevronDown, ChevronUp, Loader2, Sparkles, BookOpen } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Loader2, Sparkles, BookOpen, Download } from "lucide-react";
 import { NoteContent } from "@/types/index";
 import 'katex/dist/katex.min.css';
 import { InlineMath, BlockMath } from 'react-katex';
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
+import { generatePDF, downloadPDF } from '@/lib/export/pdf';
 
 interface Note {
   id: string;
@@ -25,6 +27,8 @@ export default function NoteDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['overview', 'definitions', 'formulas', 'howToUse', 'problems', 'applications', 'summary', 'formulaSheet'])
   );
@@ -94,6 +98,61 @@ export default function NoteDetailPage() {
     setExpandedSections(newExpanded);
   };
 
+  const handleExportLatex = async () => {
+    if (!note) return;
+    
+    setExporting(true);
+    try {
+      const response = await fetch('/api/export/latex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId: note.id }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${note.title.replace(/[^a-z0-9]/gi, '_')}.tex`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Failed to export LaTeX');
+      }
+    } catch (error) {
+      console.error('Error exporting LaTeX:', error);
+      alert('Failed to export LaTeX');
+    } finally {
+      setExporting(false);
+      setExportDropdownOpen(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!note) return;
+    
+    setExporting(true);
+    try {
+      const element = document.getElementById('note-content');
+      if (!element) {
+        alert('Note content not found');
+        return;
+      }
+
+      const blob = await generatePDF('note-content', `${note.title}.pdf`);
+      downloadPDF(blob, `${note.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Failed to export PDF');
+    } finally {
+      setExporting(false);
+      setExportDropdownOpen(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -149,6 +208,54 @@ export default function NoteDetailPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            
+            {/* Export Dropdown */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                disabled={exporting}
+              >
+                {exporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </>
+                )}
+              </Button>
+
+              {exportDropdownOpen && !exporting && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setExportDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 rounded-md border bg-card shadow-lg z-50">
+                    <div className="p-2 space-y-1">
+                      <button
+                        onClick={handleExportPDF}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        Download as PDF
+                      </button>
+                      <button
+                        onClick={handleExportLatex}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        Download as LaTeX
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
             {note.flashcardCount && note.flashcardCount > 0 ? (
               <Button 
                 onClick={() => router.push(`/dashboard/flashcards?noteId=${note.id}`)}
@@ -178,7 +285,7 @@ export default function NoteDetailPage() {
           </div>
         </div>
 
-        {/* Section 1: Brief Overview */}
+        <div id="note-content">{/* Section 1: Brief Overview */}
         <Card>
           <CardHeader>
             <SectionHeader title="1. Brief Overview" sectionKey="overview" />
@@ -355,6 +462,7 @@ export default function NoteDetailPage() {
             </CardContent>
           )}
         </Card>
+      </div>
       </div>
     </div>
   );
