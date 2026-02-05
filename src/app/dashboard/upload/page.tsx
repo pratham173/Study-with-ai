@@ -81,8 +81,11 @@ export default function UploadPage() {
         try {
           const errorData = JSON.parse(text);
           errorMessage = errorData.error || errorMessage;
-        } catch {
-          errorMessage = text || `Server error: ${response.status}`;
+        } catch (parseError) {
+          // Log parsing failure for debugging
+          console.error("Failed to parse error response as JSON:", parseError);
+          // Use generic error message with status code to avoid exposing sensitive details
+          errorMessage = `Server error: ${response.status}`;
         }
         setUploadResult({ success: false, error: errorMessage });
         return;
