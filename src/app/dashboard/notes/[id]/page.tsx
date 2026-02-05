@@ -1,0 +1,469 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter, useParams } from "next/navigation";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { ArrowLeft, ChevronDown, ChevronUp, Loader2, Sparkles, BookOpen, Download } from "lucide-react";
+import { NoteContent } from "@/types/index";
+import 'katex/dist/katex.min.css';
+import { InlineMath, BlockMath } from 'react-katex';
+import { ThemeSwitcher } from "@/components/theme/theme-switcher";
+import { generatePDF, downloadPDF } from '@/lib/export/pdf';
+
+interface Note {
+  id: string;
+  title: string;
+  content: NoteContent;
+  createdAt: string;
+  flashcardCount?: number;
+}
+
+export default function NoteDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const noteId = params.id as string;
+  const [note, setNote] = useState<Note | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [generatingFlashcards, setGeneratingFlashcards] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(
+    new Set(['overview', 'definitions', 'formulas', 'howToUse', 'problems', 'applications', 'summary', 'formulaSheet'])
+  );
+
+  useEffect(() => {
+    fetchNote();
+  }, [noteId]);
+
+  const fetchNote = async () => {
+    try {
+      const response = await fetch(`/api/notes/${noteId}`);
+      const data = await response.json();
+
+      if (data.success) {
+        setNote(data.note);
+        // Fetch flashcard count
+        const flashcardsResponse = await fetch(`/api/flashcards?noteId=${noteId}`);
+        const flashcardsData = await flashcardsResponse.json();
+        if (flashcardsData.success) {
+          setNote(prev => prev ? { ...prev, flashcardCount: flashcardsData.flashcards.length } : null);
+        }
+      } else {
+        setError(data.error || "Failed to load note");
+      }
+    } catch (err) {
+      setError("Failed to load note");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateFlashcards = async () => {
+    if (!note || generatingFlashcards) return;
+    
+    setGeneratingFlashcards(true);
+    try {
+      const response = await fetch('/api/generate/flashcards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId: note.id }),
+      });
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setNote(prev => prev ? { ...prev, flashcardCount: data.count } : null);
+        router.push(`/dashboard/flashcards?noteId=${note.id}`);
+      } else {
+        alert(data.error || 'Failed to generate flashcards');
+      }
+    } catch (error) {
+      console.error('Error generating flashcards:', error);
+      alert('Failed to generate flashcards');
+    } finally {
+      setGeneratingFlashcards(false);
+    }
+  };
+
+  const toggleSection = (section: string) => {
+    const newExpanded = new Set(expandedSections);
+    if (newExpanded.has(section)) {
+      newExpanded.delete(section);
+    } else {
+      newExpanded.add(section);
+    }
+    setExpandedSections(newExpanded);
+  };
+
+  const handleExportLatex = async () => {
+    if (!note) return;
+    
+    setExporting(true);
+    try {
+      const response = await fetch('/api/export/latex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ noteId: note.id }),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${note.title.replace(/[^a-z0-9]/gi, '_')}.tex`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else {
+        alert('Failed to export LaTeX');
+      }
+    } catch (error) {
+      console.error('Error exporting LaTeX:', error);
+      alert('Failed to export LaTeX');
+    } finally {
+      setExporting(false);
+      setExportDropdownOpen(false);
+    }
+  };
+
+  const handleExportPDF = async () => {
+    if (!note) return;
+    
+    setExporting(true);
+    try {
+      const element = document.getElementById('note-content');
+      if (!element) {
+        alert('Note content not found');
+        return;
+      }
+
+      const blob = await generatePDF('note-content', `${note.title}.pdf`);
+      downloadPDF(blob, `${note.title.replace(/[^a-z0-9]/gi, '_')}.pdf`);
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      alert('Failed to export PDF');
+    } finally {
+      setExporting(false);
+      setExportDropdownOpen(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error || !note) {
+    return (
+      <div className="min-h-screen bg-background p-8">
+        <div className="max-w-4xl mx-auto">
+          <Card className="border-destructive">
+            <CardContent className="p-6">
+              <p className="text-destructive">{error || "Note not found"}</p>
+              <Button onClick={() => router.push("/dashboard/notes")} className="mt-4">
+                Back to Notes
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  const SectionHeader = ({ title, sectionKey }: { title: string; sectionKey: string }) => (
+    <div
+      className="flex items-center justify-between cursor-pointer select-none"
+      onClick={() => toggleSection(sectionKey)}
+    >
+      <h2 className="text-2xl font-bold">{title}</h2>
+      {expandedSections.has(sectionKey) ? (
+        <ChevronUp className="h-5 w-5" />
+      ) : (
+        <ChevronDown className="h-5 w-5" />
+      )}
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-background p-8">
+      <div className="max-w-5xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button variant="outline" size="icon" onClick={() => router.push("/dashboard/notes")}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h1 className="text-4xl font-bold">{note.title}</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                Created on {new Date(note.createdAt).toLocaleDateString()}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeSwitcher />
+            
+            {/* Export Dropdown */}
+            <div className="relative">
+              <Button
+                variant="outline"
+                onClick={() => setExportDropdownOpen(!exportDropdownOpen)}
+                disabled={exporting}
+              >
+                {exporting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Exporting...
+                  </>
+                ) : (
+                  <>
+                    <Download className="mr-2 h-4 w-4" />
+                    Export
+                  </>
+                )}
+              </Button>
+
+              {exportDropdownOpen && !exporting && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setExportDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-48 rounded-md border bg-card shadow-lg z-50">
+                    <div className="p-2 space-y-1">
+                      <button
+                        onClick={handleExportPDF}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        Download as PDF
+                      </button>
+                      <button
+                        onClick={handleExportLatex}
+                        className="w-full text-left px-3 py-2 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                      >
+                        Download as LaTeX
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {note.flashcardCount && note.flashcardCount > 0 ? (
+              <Button 
+                onClick={() => router.push(`/dashboard/flashcards?noteId=${note.id}`)}
+                variant="outline"
+              >
+                <BookOpen className="mr-2 h-4 w-4" />
+                View Flashcards ({note.flashcardCount})
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleGenerateFlashcards}
+                disabled={generatingFlashcards}
+              >
+                {generatingFlashcards ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" />
+                    Generate Flashcards
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div id="note-content">{/* Section 1: Brief Overview */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="1. Brief Overview" sectionKey="overview" />
+          </CardHeader>
+          {expandedSections.has('overview') && (
+            <CardContent>
+              <div className="prose dark:prose-invert max-w-none">
+                <p className="whitespace-pre-line">{note.content.briefOverview}</p>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 2: Important Definitions */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="2. Important Definitions" sectionKey="definitions" />
+          </CardHeader>
+          {expandedSections.has('definitions') && (
+            <CardContent>
+              <div className="space-y-4">
+                {note.content.definitions.map((def, index) => (
+                  <div key={index} className="border-l-4 border-primary pl-4">
+                    <h3 className="font-bold text-lg">{def.term}</h3>
+                    <p className="text-muted-foreground mt-1">{def.definition}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 3: Formulas */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="3. Formulas Section" sectionKey="formulas" />
+          </CardHeader>
+          {expandedSections.has('formulas') && (
+            <CardContent>
+              <div className="space-y-6">
+                {note.content.formulas.map((formula, index) => (
+                  <div key={index} className="bg-muted/50 rounded-lg p-4 space-y-3">
+                    <div className="text-center text-2xl py-2">
+                      <BlockMath math={formula.latex} />
+                    </div>
+                    <p className="font-semibold">{formula.explanation}</p>
+                    
+                    <div className="space-y-1">
+                      <p className="font-medium">Where:</p>
+                      <ul className="list-none space-y-1 ml-4">
+                        {formula.symbols.map((sym, i) => (
+                          <li key={i}>
+                            <InlineMath math={sym.symbol} /> = {sym.meaning}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    <p><span className="font-medium">Units:</span> {formula.units}</p>
+                    <p><span className="font-medium">Significance:</span> {formula.significance}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 4: How to Use the Formula */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="4. How to Use the Formula" sectionKey="howToUse" />
+          </CardHeader>
+          {expandedSections.has('howToUse') && (
+            <CardContent>
+              <div className="prose dark:prose-invert max-w-none">
+                <div className="whitespace-pre-line">{note.content.howToUse}</div>
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 5: Solved Problems */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="5. Solved Problems" sectionKey="problems" />
+          </CardHeader>
+          {expandedSections.has('problems') && (
+            <CardContent>
+              <div className="space-y-6">
+                {['easy', 'medium', 'tough'].map((level) => {
+                  const problems = note.content.solvedProblems.filter(p => p.level === level);
+                  if (problems.length === 0) return null;
+                  
+                  return (
+                    <div key={level}>
+                      <h3 className="text-xl font-bold mb-3 capitalize">
+                        {level === 'easy' ? '📗 Easy' : level === 'medium' ? '📘 Medium' : '📕 Tough'} Problems
+                      </h3>
+                      <div className="space-y-4">
+                        {problems.map((problem, index) => (
+                          <div key={index} className="border rounded-lg p-4 space-y-3">
+                            <p className="font-semibold">Question {index + 1}:</p>
+                            <p>{problem.question}</p>
+                            <div className="bg-muted/50 rounded p-3">
+                              <p className="font-medium mb-2">Solution:</p>
+                              <div className="whitespace-pre-line text-sm">{problem.solution}</div>
+                            </div>
+                            <div className="bg-primary/10 rounded p-3 text-center">
+                              <p className="font-medium mb-1">Answer:</p>
+                              <BlockMath math={problem.answer.replace(/^\\boxed\{/, '').replace(/\}$/, '')} />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 6: Real Life Applications */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="6. Real Life Applications" sectionKey="applications" />
+          </CardHeader>
+          {expandedSections.has('applications') && (
+            <CardContent>
+              <div className="space-y-4">
+                {note.content.realLifeApplications.map((app, index) => (
+                  <div key={index} className="border-l-4 border-green-500 pl-4 py-2">
+                    <p>{app}</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 7: Summary */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="7. Summary" sectionKey="summary" />
+          </CardHeader>
+          {expandedSections.has('summary') && (
+            <CardContent>
+              <ul className="space-y-2">
+                {note.content.summary.map((item, index) => (
+                  <li key={index} className="flex items-start gap-2">
+                    <span className="text-primary mt-1">•</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          )}
+        </Card>
+
+        {/* Section 8: Compiled Formula Sheet */}
+        <Card>
+          <CardHeader>
+            <SectionHeader title="8. Compiled Formula Sheet" sectionKey="formulaSheet" />
+          </CardHeader>
+          {expandedSections.has('formulaSheet') && (
+            <CardContent>
+              <div className="bg-muted/50 rounded-lg p-6 space-y-3">
+                {note.content.formulaSheet.map((formula, index) => (
+                  <div key={index} className="text-center text-lg py-1 border-b last:border-b-0">
+                    <BlockMath math={formula} />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          )}
+        </Card>
+      </div>
+      </div>
+    </div>
+  );
+}
