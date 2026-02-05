@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, useRef, DragEvent, ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Upload, FileText, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Upload, FileText, CheckCircle, XCircle, Loader2, FileSpreadsheet } from "lucide-react";
 
 interface UploadResponse {
   success: boolean;
@@ -15,10 +16,12 @@ interface UploadResponse {
 }
 
 export default function UploadPage() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<UploadResponse | null>(null);
   const [dragActive, setDragActive] = useState(false);
+  const [generatingNotes, setGeneratingNotes] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const allowedTypes = ["PDF", "DOCX", "TXT", "PPT", "PPTX", "JPG", "PNG"];
@@ -93,6 +96,40 @@ export default function UploadPage() {
     if (bytes < 1024) return bytes + " B";
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
     return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  };
+
+  const handleGenerateNotes = async () => {
+    if (!uploadResult?.success || !uploadResult.content) return;
+
+    setGeneratingNotes(true);
+
+    try {
+      const response = await fetch("/api/generate/notes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          content: uploadResult.content,
+          title: uploadResult.fileName || "Untitled Note",
+          fileName: uploadResult.fileName,
+          fileType: uploadResult.fileType,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (data.success && data.note) {
+        router.push(`/dashboard/notes/${data.note.id}`);
+      } else {
+        alert(data.error || "Failed to generate notes");
+      }
+    } catch (error) {
+      console.error("Error generating notes:", error);
+      alert("Failed to generate notes. Please try again.");
+    } finally {
+      setGeneratingNotes(false);
+    }
   };
 
   return (
@@ -243,8 +280,22 @@ export default function UploadPage() {
                   Total length: {uploadResult.content.length.toLocaleString()}{" "}
                   characters
                 </p>
-                <Button variant="outline" size="sm">
-                  Generate Notes
+                <Button 
+                  onClick={handleGenerateNotes}
+                  disabled={generatingNotes}
+                  size="sm"
+                >
+                  {generatingNotes ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <FileSpreadsheet className="mr-2 h-4 w-4" />
+                      Generate Notes
+                    </>
+                  )}
                 </Button>
               </div>
             </CardContent>
